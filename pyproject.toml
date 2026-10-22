@@ -1,0 +1,9 @@
+[project]
+name = "ai-code-reviewer"
+version = "0.1.0"
+description = "Reviews git diffs and GitHub pull requests with Claude Code running headless (claude -p)."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+ai-review = "reviewer.cli:main"

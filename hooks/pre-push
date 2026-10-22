@@ -1,0 +1,25 @@
+#!/bin/sh
+# Optional git hook: review what you are about to push and block on serious issues.
+#
+#   Install:   cp hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#   Skip once: git push --no-verify
+#
+# Set AI_REVIEWER_HOME if this repo is not installed with pipx/pip.
+
+BASE=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo origin/main)
+
+if command -v ai-review >/dev/null 2>&1; then
+  ai-review --base "$BASE" --fail-on high --out .git/ai-review.md
+else
+  PYTHONPATH="${AI_REVIEWER_HOME:-$HOME/IdeaProjects/ai-code-reviewer}" \
+    python3 -m reviewer --base "$BASE" --fail-on high --out .git/ai-review.md
+fi
+status=$?
+
+if [ $status -eq 1 ]; then
+  echo "AI review found high or critical issues (see .git/ai-review.md). Push blocked; use --no-verify to override." >&2
+elif [ $status -ne 0 ]; then
+  echo "AI review could not run (exit $status); pushing anyway." >&2
+  exit 0
+fi
+exit $status

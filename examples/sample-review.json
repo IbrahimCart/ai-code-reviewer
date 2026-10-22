@@ -1,0 +1,107 @@
+{
+  "summary": "This PR adds an average_age helper, a user search, pagination, and avatar loading. It has serious security problems. The search query is built by string concatenation, which allows SQL injection. load_avatar can read any file on the server (path traversal). An API key is hardcoded in the source. There are also bugs: an off-by-one in pagination, division by zero on an empty list, and leaked database connections and file handles.",
+  "verdict": "request_changes",
+  "findings": [
+    {
+      "file": "app/users.py",
+      "line": 19,
+      "severity": "critical",
+      "category": "security",
+      "title": "SQL injection in search_users via string concatenation.",
+      "explanation": "User-controlled `name` is put straight into the SQL string. Input like `' OR 1=1 --` or a UNION payload can dump or change any table.",
+      "suggestion": "Use a parameterized query: `db.execute(\"SELECT id, name, email FROM users WHERE name LIKE ?\", (f\"%{name}%\",))`.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/users.py",
+      "line": 30,
+      "severity": "critical",
+      "category": "security",
+      "title": "Path traversal in load_avatar.",
+      "explanation": "A `filename` like `../../etc/passwd` or an absolute path lets a caller read any file the process can access.",
+      "suggestion": "Resolve the path and check that it stays inside the avatars directory: `base = Path('avatars').resolve(); p = (base / filename).resolve(); if not p.is_relative_to(base): raise ValueError`. Better still, allow only safe basenames.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/users.py",
+      "line": 3,
+      "severity": "high",
+      "category": "security",
+      "title": "API key hardcoded in source.",
+      "explanation": "Secrets committed to the repo end up in version history and are visible to anyone with access to the code.",
+      "suggestion": "Load the key from an environment variable or a secrets manager (`os.environ[\"API_KEY\"]`) and rotate the exposed key.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/users.py",
+      "line": 25,
+      "severity": "high",
+      "category": "bug",
+      "title": "Off-by-one in get_page: page 1 skips the first page.",
+      "explanation": "The docstring says pages start at 1, but `start = page * per_page` makes page 1 return items 10-19, so the first page can never be returned.",
+      "suggestion": "Use `start = (page - 1) * per_page` and reject `page < 1`.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/stats.py",
+      "line": 5,
+      "severity": "medium",
+      "category": "bug",
+      "title": "ZeroDivisionError when users is empty.",
+      "explanation": "`len(users)` is 0 for an empty list, so the function raises an unhandled exception.",
+      "suggestion": "Return None or 0 for an empty list, or raise a clear ValueError: `if not users: return None`.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/users.py",
+      "line": 20,
+      "severity": "medium",
+      "category": "bug",
+      "title": "Database connection never closed in search_users.",
+      "explanation": "Each call opens a sqlite connection and never closes it, so connections and file handles leak under load.",
+      "suggestion": "Use `with closing(get_db()) as db:` or call db.close() in a try/finally block, as get_user does.",
+      "on_changed_line": true
+    },
+    {
+      "file": "app/users.py",
+      "line": 30,
+      "severity": "low",
+      "category": "bug",
+      "title": "File handle leaked in load_avatar.",
+      "explanation": "The file is opened without being closed, so the handle stays open until garbage collection.",
+      "suggestion": "`with open(path, 'rb') as f: return f.read()`.",
+      "on_changed_line": true
+    }
+  ],
+  "suggested_tests": [
+    {
+      "file": "tests/test_users.py",
+      "description": "search_users with input `' OR '1'='1` returns no rows (or only literal matches) and does not raise, which confirms the query is parameterized."
+    },
+    {
+      "file": "tests/test_users.py",
+      "description": "get_page(list(range(25)), 1) returns [0..9], page 3 returns [20..24], and page 0 raises ValueError."
+    },
+    {
+      "file": "tests/test_users.py",
+      "description": "load_avatar('../users.py') and load_avatar('/etc/passwd') raise an error instead of returning file contents."
+    },
+    {
+      "file": "tests/test_stats.py",
+      "description": "average_age([]) is handled gracefully (returns None or raises ValueError), and average_age([{'age':20},{'age':30}]) == 25."
+    }
+  ],
+  "dropped": [],
+  "notes": [],
+  "skipped_files": [
+    {
+      "file": "package-lock.json",
+      "reason": "generated or vendored file"
+    }
+  ],
+  "meta": {
+    "model": "claude-opus-5-5",
+    "duration_s": 13.5,
+    "cost_usd": 0.053807999999999995
+  }
+}
