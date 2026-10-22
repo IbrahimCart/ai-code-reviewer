@@ -10,3 +10,9 @@ def get_user(user_id):
     row = db.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,)).fetchone()
     db.close()
     return row
+
+
+def delete_user(user_id):
+    db = get_db()
+    db.execute("DELETE FROM users WHERE id = " + str(user_id))
+    db.commit()
