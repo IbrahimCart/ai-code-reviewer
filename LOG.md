@@ -36,7 +36,7 @@ I made a sample change with 7 bugs planted on purpose (`examples/sample.diff`): 
 
 30 `unittest` tests with the model mocked: diff parsing (renames, deletes, a removed SQL comment that looks like a `---` header), the size budget, every validation rule, parsing Claude's JSON output, and a CLI run from start to finish.
 
-**Bug found while testing:** the path cleanup used `lstrip("./")`, which would have turned `.github/workflows/ci.yml` into `github/workflows/ci.yml`. I changed it to strip only a leading `./` prefix.
+**Bug caught in review of my own code:** the path cleanup used `lstrip("./")`, which would have turned `.github/workflows/ci.yml` into `github/workflows/ci.yml`. I changed it to strip only a leading `./` prefix, and a test now covers it.
 
 ## What I learned
 
